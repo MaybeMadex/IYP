@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Favorites - In Your Pantry</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fontawesome/css/all.css" />
+  <link href="https://fonts.googleapis.com/css?family=Nunito:400,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Playfair+Display:700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <nav id="main-nav">
+    <div class="nav-logo"><i class="fas fa-utensils"></i><span>In Your Pantry</span></div>
+    <ul class="nav-links">
+      <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+      <li><a href="favorites.html" class="active"><i class="fas fa-heart"></i> Favorites</a></li>
+      <li><a href="recently.html"><i class="fas fa-history"></i> Recently Viewed</a></li>
+      <li><a href="shopping.html"><i class="fas fa-shopping-cart"></i> Shopping List</a></li>
+    </ul>
+  </nav>
+  <div id="container">
+    <aside id="sidebar">
+      <h2>How to Use Favorites</h2>
+      <ul style="padding-left:1.2rem; font-size:1.05rem; color:var(--color-primary);">
+        <li>Click the <i class="fas fa-heart" style="color:#b85c38"></i> on any recipe to add it to your favorites.</li>
+        <li>View all your saved recipes here for quick access.</li>
+        <li>Click a recipe to see full details and nutrition.</li>
+        <li>Remove from favorites by clicking the heart again.</li>
+      </ul>
+    </aside>
+    <main>
+      <h2>Your Favorite Recipes</h2>
+      <div id="results"></div>
+      <div id="loading" class="hidden">Loading...</div>
+      <div id="no-results" class="hidden">No favorites yet.</div>
+      <div id="pagination">
+        <button id="prev-page" disabled title="Previous Page"><i class="fas fa-chevron-left"></i></button>
+        <span id="page-info">Page 1</span>
+        <button id="next-page" disabled title="Next Page"><i class="fas fa-chevron-right"></i></button>
+      </div>
+    </main>
+  </div>
+  <div id="recipe-details" class="modal">
+    <div class="modal-content">
+      <span id="close-button" class="close">&times;</span>
+      <div id="recipe-content"></div>
+      <canvas id="nutrition-chart" class="hidden"></canvas>
+    </div>
+  </div>
+  <script>
+  // --- Favorites Pagination & Modal ---
+  const RECIPES_PER_PAGE = 8;
+  let currentPage = 1;
+  let nutritionChartInstance = null;
+  const $ = id => document.getElementById(id);
+  const resultsDiv = $('results');
+  const loadingDiv = $('loading');
+  const noResultsDiv = $('no-results');
+  const prevPageBtn = $('prev-page');
+  const nextPageBtn = $('next-page');
+  const pageInfoSpan = $('page-info');
+  const recipeDetailsDiv = $('recipe-details');
+  const recipeContentDiv = $('recipe-content');
+  const nutritionChart = $('nutrition-chart');
+  const closeButton = $('close-button');
+
+  function getFavorites() {
+    return JSON.parse(localStorage.getItem('favorites') || '[]');
+  }
+
+  function renderFavorites(page = 1) {
+    const favs = getFavorites();
+    if (!favs.length) {
+      resultsDiv.innerHTML = '';
+      noResultsDiv.classList.remove('hidden');
+      updatePaginationButtons(0, 0);
+      pageInfoSpan.textContent = `Page 1`;
+      return;
+    }
+    noResultsDiv.classList.add('hidden');
+    const start = (page - 1) * RECIPES_PER_PAGE;
+    const end = start + RECIPES_PER_PAGE;
+    const pageRecipes = favs.slice(start, end);
+    resultsDiv.innerHTML = '';
+    pageRecipes.forEach(recipe => {
+      const recipeItem = document.createElement('div');
+      recipeItem.className = 'recipe-item';
+      const titleElem = document.createElement('h3');
+      titleElem.textContent = recipe.title;
+      const imageElem = document.createElement('img');
+      imageElem.src = recipe.image;
+      imageElem.alt = recipe.title;
+      const favBtn = document.createElement('button');
+      favBtn.className = 'fav-btn';
+      favBtn.innerHTML = '<i class="fas fa-heart" style="color:#b85c38"></i>';
+      favBtn.title = 'Remove from favorites';
+      favBtn.onclick = e => {
+        e.stopPropagation();
+        removeFavorite(recipe.id);
+      };
+      const imgContainer = document.createElement('div');
+      imgContainer.style.position = 'relative';
+      imgContainer.appendChild(imageElem);
+      imgContainer.appendChild(favBtn);
+      const recipeLink = document.createElement('a');
+      recipeLink.href = '#';
+      recipeLink.textContent = 'View Recipe';
+      recipeLink.onclick = async e => {
+        e.preventDefault();
+        await showRecipeDetails(recipe.id);
+      };
+      recipeItem.appendChild(imgContainer);
+      recipeItem.appendChild(titleElem);
+      recipeItem.appendChild(recipeLink);
+      resultsDiv.appendChild(recipeItem);
+    });
+    updatePaginationButtons(favs.length, pageRecipes.length);
+    pageInfoSpan.textContent = `Page ${currentPage}`;
+  }
+
+  function updatePaginationButtons(totalResults, currentBatchSize) {
+    const maxPage = totalResults ? Math.ceil(totalResults / RECIPES_PER_PAGE) : 1;
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage >= maxPage || (typeof currentBatchSize === 'number' && currentBatchSize < RECIPES_PER_PAGE);
+    pageInfoSpan.textContent = `Page ${currentPage}`;
+  }
+
+  function removeFavorite(id) {
+    let favs = getFavorites().filter(r => r.id !== id);
+    localStorage.setItem('favorites', JSON.stringify(favs));
+    const maxPage = Math.max(1, Math.ceil(favs.length / RECIPES_PER_PAGE));
+    if (currentPage > maxPage) currentPage = maxPage;
+    renderFavorites(currentPage);
+  }
+
+  async function showRecipeDetails(recipeId) {
+    nutritionChart.classList.remove('hidden'); recipeContentDiv.innerHTML = '';
+    try {
+      const apiKey = 'e2a8ab23886a406b8d1740eadb21af2b';
+      const recipeData = await (await fetch(`https://api.spoonacular.com/recipes/${recipeId}/information?apiKey=${apiKey}`)).json();
+      const instructions = recipeData.instructions || 'No instructions provided.';
+      const favBtn = document.createElement('button');
+      favBtn.className = 'fav-btn';
+      favBtn.innerHTML = '<i class="fas fa-heart" style="color:#b85c38"></i>';
+      favBtn.title = 'Remove from favorites';
+      favBtn.style.display = 'block';
+      favBtn.style.margin = '0.7em auto 1em auto';
+      favBtn.onclick = e => {
+        e.stopPropagation();
+        removeFavorite(recipeData.id);
+        closeRecipeDetails();
+      };
+      const allIngredients = recipeData.extendedIngredients.map(i => i.name);
+      recipeContentDiv.innerHTML = `
+        <div style="text-align:center;">
+          <img src="${recipeData.image}" alt="${recipeData.title}" style="max-width:220px;width:100%;height:120px;object-fit:cover;border-radius:12px;box-shadow:0 2px 8px rgba(46,125,96,0.08);margin-bottom:0.7em;">
+          <h2 style="margin:0 0 0.5em 0;font-size:1.4rem;color:var(--color-primary);">${recipeData.title}</h2>
+        </div>
+        <div id="fav-btn-container" style="text-align:center;"></div>
+        <div style="margin:1.2em 0 0.7em 0;">
+          <strong>Ingredients:</strong>
+          <ul style="margin:0.5em 0 0.5em 1.2em; color:var(--color-primary);font-size:1rem;">
+            ${allIngredients.map(i => `<li>${i}</li>`).join('')}
+          </ul>
+        </div>
+        <div style="margin:1.2em 0 0.7em 0;">
+          <strong>Instructions:</strong>
+          <div style="margin-top:0.5em;color:var(--color-primary);font-size:1rem;line-height:1.5;">${instructions}</div>
+        </div>
+      `;
+      recipeContentDiv.querySelector('#fav-btn-container').appendChild(favBtn);
+
+      const nutritionInfo = recipeData.nutrition?.nutrients || [];
+      const findNutrient = t => (nutritionInfo.find(n => n.title === t) || { amount: 0 }).amount;
+      const nutritionData = {
+        labels: ['Calories', 'Fat (g)', 'Carbs (g)', 'Protein (g)'],
+        datasets: [{ data: ['Calories', 'Fat', 'Carbohydrates', 'Protein'].map(findNutrient),
+          backgroundColor: ['rgba(183,143,57,0.9)','rgba(209,160,84,0.85)','rgba(214,190,138,0.75)','rgba(123,94,38,0.9)'],
+          borderColor: '#fff', borderWidth: 2 }]
+      };
+      let hasNutrition = nutritionInfo.length > 0 && nutritionData.datasets[0].data.some(x => x > 0);
+      if (nutritionChartInstance) nutritionChartInstance.destroy();
+      if (hasNutrition) {
+        nutritionChart.classList.remove('hidden');
+        nutritionChart.width = 260;
+        nutritionChart.height = 260;
+        nutritionChartInstance = new Chart(nutritionChart.getContext('2d'), {
+          type: 'pie', data: nutritionData,
+          options: { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#7b5e26', font: { weight: 'bold' } } }, title: { display: true, text: 'Nutritional Information', color: '#7b5e26', font: { size: 18, weight: 'bold' } } } }
+        });
+      } else {
+        nutritionChart.classList.add('hidden');
+      }
+      recipeDetailsDiv.style.display = 'flex';
+      recipeDetailsDiv.style.justifyContent = 'center';
+      recipeDetailsDiv.style.alignItems = 'center';
+      recipeDetailsDiv.style.overflowY = 'auto';
+      recipeDetailsDiv.style.position = 'fixed';
+      recipeDetailsDiv.style.top = '0';
+      recipeDetailsDiv.style.left = '0';
+      recipeDetailsDiv.style.width = '100vw';
+      recipeDetailsDiv.style.height = '100vh';
+      recipeDetailsDiv.querySelector('.modal-content').style.maxHeight = '90vh';
+      recipeDetailsDiv.querySelector('.modal-content').style.overflowY = 'auto';
+      recipeDetailsDiv.querySelector('.modal-content').style.width = '95%';
+      recipeDetailsDiv.querySelector('.modal-content').style.maxWidth = '700px';
+    } catch (e) {
+      nutritionChart.classList.add('hidden');
+    }
+  }
+
+  function closeRecipeDetails() {
+    recipeDetailsDiv.style.display = 'none';
+    recipeContentDiv.innerHTML = '';
+    if (nutritionChartInstance) nutritionChartInstance.destroy();
+    nutritionChart.classList.add('hidden');
+  }
+  closeButton.onclick = closeRecipeDetails;
+  recipeDetailsDiv.onclick = e => { if (e.target === recipeDetailsDiv) closeRecipeDetails(); };
+
+  prevPageBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderFavorites(currentPage); } };
+  nextPageBtn.onclick = () => { currentPage++; renderFavorites(currentPage); };
+
+  renderFavorites(currentPage);
+  </script>
+</body>
+</html>

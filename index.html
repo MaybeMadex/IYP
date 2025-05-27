@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>In Your Pantry</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fontawesome/css/all.css" />
+  <link href="https://fonts.googleapis.com/css?family=Nunito:400,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Playfair+Display:700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <nav id="main-nav">
+    <div class="nav-logo"><i class="fas fa-utensils"></i><span>In Your Pantry</span></div>
+    <ul class="nav-links">
+      <li><a href="index.html" class="active"><i class="fas fa-home"></i> Home</a></li>
+      <li><a href="favorites.html"><i class="fas fa-heart"></i> Favorites</a></li>
+      <li><a href="recently.html"><i class="fas fa-history"></i> Recently Viewed</a></li>
+      <li><a href="shopping.html"><i class="fas fa-shopping-cart"></i> Shopping List</a></li>
+    </ul>
+  </nav>
+  <div id="container">
+    <aside id="sidebar">
+      <h2>Search & Filter</h2>
+      <label for="ingredient-tags">Search:</label>
+      <div id="ingredient-tags" class="tag-input" tabindex="0">
+        <input type="text" id="ingredient-input" placeholder="Type ingredients or recipe name and press Enter..." autocomplete="off" />
+      </div>
+      <label>Diet:</label>
+      <div id="diet-tags" class="tag-selector"></div>
+      <label>Intolerances:</label>
+      <div id="intolerance-tags" class="tag-selector"></div>
+      <button id="search-button">Search</button>
+    </aside>
+    <main>
+      <div id="results"></div>
+      <div id="loading" class="hidden">Loading...</div>
+      <div id="no-results" class="hidden">No recipes found.</div>
+      <div id="pagination">
+        <button id="prev-page" disabled title="Previous Page"><i class="fas fa-chevron-left"></i></button>
+        <span id="page-info">Page 1</span>
+        <button id="next-page" disabled title="Next Page"><i class="fas fa-chevron-right"></i></button>
+      </div>
+    </main>
+  </div>
+  <div id="recipe-details" class="modal">
+    <div class="modal-content">
+      <span id="close-button" class="close">&times;</span>
+      <div id="recipe-content"></div>
+      <canvas id="nutrition-chart" class="hidden"></canvas>
+    </div>
+  </div>
+  <script src="main.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const hash = window.location.hash;
+      if (hash && /^\#\d+$/.test(hash)) {
+        const recipeId = hash.substring(1);
+        if (window.showRecipeDetails) showRecipeDetails(recipeId);
+        else setTimeout(() => showRecipeDetails(recipeId), 500);
+      }
+    });
+  </script>
+</body>
+</html>

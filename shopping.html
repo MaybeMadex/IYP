@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shopping List - In Your Pantry</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="fontawesome/css/all.css" />
+  <link href="https://fonts.googleapis.com/css?family=Nunito:400,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css?family=Playfair+Display:700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav id="main-nav">
+    <div class="nav-logo"><i class="fas fa-utensils"></i><span>In Your Pantry</span></div>
+    <ul class="nav-links">
+      <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+      <li><a href="favorites.html"><i class="fas fa-heart"></i> Favorites</a></li>
+      <li><a href="recently.html"><i class="fas fa-history"></i> Recently Viewed</a></li>
+      <li><a href="shopping.html" class="active"><i class="fas fa-shopping-cart"></i> Shopping List</a></li>
+    </ul>
+  </nav>
+  <div id="container">
+    <aside id="sidebar">
+      <h2>Shopping List Tips</h2>
+      <ul style="padding-left:1.2rem; font-size:1.05rem; color:var(--color-primary);">
+        <li>Add missing ingredients from recipes to your shopping list.</li>
+        <li>Check off items as you shop.</li>
+        <li>Clear the list when you’re done shopping.</li>
+        <li>Use this page to plan your next grocery trip!</li>
+      </ul>
+    </aside>
+    <main>
+      <h2>Your Shopping List</h2>
+      <div id="shopping-list">
+        <p style="color: var(--color-primary); font-size: 1.1rem;">Your shopping list is empty.</p>
+      </div>
+      <button id="clear-shopping-list" style="margin-top:1em;background:var(--color-accent-dark);color:#fff;border:none;border-radius:18px;padding:0.5em 1.5em;font-weight:700;cursor:pointer;">Clear List</button>
+    </main>
+  </div>
+  <script>
+    function getShoppingList() {
+      return JSON.parse(localStorage.getItem('shoppingList') || '[]');
+    }
+    function setShoppingList(list) {
+      localStorage.setItem('shoppingList', JSON.stringify(list));
+    }
+    function renderShoppingList() {
+      const list = getShoppingList();
+      const container = document.getElementById('shopping-list');
+      if (!list.length) {
+        container.innerHTML = '<p style="color: var(--color-primary); font-size: 1.1rem;">Your shopping list is empty.</p>';
+        return;
+      }
+      container.innerHTML = '<ul style="list-style:none;padding:0;">' +
+        list.map((item, idx) =>
+          `<li style="margin-bottom:0.7em;display:flex;align-items:center;">
+            <input type="checkbox" id="chk${idx}" style="margin-right:0.7em;">
+            <label for="chk${idx}" style="flex:1;">${item}</label>
+            <button class="remove-item" data-idx="${idx}" style="margin-left:1em;background:var(--color-tag-remove);color:#fff;border:none;border-radius:12px;padding:0.2em 0.7em;cursor:pointer;">Remove</button>
+          </li>`
+        ).join('') +
+        '</ul>';
+      container.querySelectorAll('.remove-item').forEach(btn => {
+        btn.onclick = () => {
+          const idx = +btn.getAttribute('data-idx');
+          let list = getShoppingList();
+          list.splice(idx, 1);
+          setShoppingList(list);
+          renderShoppingList();
+        };
+      });
+    }
+    document.getElementById('clear-shopping-list').onclick = () => {
+      setShoppingList([]);
+      renderShoppingList();
+    };
+    renderShoppingList();
+  </script>
+</body>
+</html>
